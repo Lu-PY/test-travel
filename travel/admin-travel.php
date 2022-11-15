@@ -2,10 +2,39 @@
 require_once("../db-connect2.php");
 
 if (isset($_GET["search"])) {
+    if (isset($_GET["userPage"])) {
+        $userPage = $_GET["userPage"];
+    } else {
+        $userPage = 1;
+    }
+    if (isset($_GET["travelPage"])) {
+        $travelPage = $_GET["travelPage"];
+    } else {
+        $travelPage = 1;
+    }
+    if(isset($_GET["area"])){
+        $area=$_GET["area"];
+    }else{
+        $area=3;
+    }
+    $per_page = 5;
+    $userPage_start = ($userPage - 1) * $per_page;
+    $travelPage_start = ($travelPage - 1) * $per_page;
     $search = $_GET["search"];
-    $sql = "SELECT * FROM travel_account WHERE account LIKE '%$search%' AND valid=1 ORDER BY created_at DESC";
+
+    if($area==0||$area==1||$area==2){
+        $sqlAll = "SELECT * FROM travel_account WHERE account LIKE '%$search%' AND valid=1 AND area='$area' ORDER BY created_at DESC";
+        $sql = "SELECT * FROM travel_account WHERE account LIKE '%$search%' AND valid=1 AND area='$area' ORDER BY created_at DESC  LIMIT $userPage_start, $per_page";
+    }else{
+        $sqlAll = "SELECT * FROM travel_account WHERE account LIKE '%$search%' AND valid=1 ORDER BY created_at DESC";
+        $sql = "SELECT * FROM travel_account WHERE account LIKE '%$search%' AND valid=1 ORDER BY created_at DESC  LIMIT $userPage_start, $per_page";
+    }
+   
+    
+    $resultAll = $conn->query($sqlAll);
     $result = $conn->query($sql);
-    $userCount = $result->num_rows;
+    
+    $userCount = $resultAll->num_rows;
     $sqlTripComment = "SELECT trip_comment.*,trip_event.owner,trip_event.id,travel_account.account,travel_account.id FROM trip_comment JOIN trip_event ON trip_event.id=trip_comment.trip JOIN travel_account ON trip_event.owner=travel_account.account  WHERE trip_comment.valid=1 ORDER BY created_at";
     $resultTripComment = $conn->query($sqlTripComment);
     $tripCommentCount = $resultTripComment->num_rows;
@@ -13,13 +42,17 @@ if (isset($_GET["search"])) {
     // $resultTravel = $conn->query($sqlTravel);
     // $travelCount=$resultTravel->num_rows;
     // $page=1;
-    $per_page = 5;
-    
-
-    $sqlTravel = "SELECT * FROM trip_event WHERE valid=1 ORDER BY created_at DESC LIMIT  $per_page ";
+   
+    $sqlTravelAll = "SELECT * FROM trip_event WHERE valid=1 ORDER BY created_at DESC";
+    $sqlTravel = "SELECT trip_event.*,travel_account.account,travel_account.id as account_id FROM trip_event JOIN travel_account ON trip_event.owner=travel_account.account WHERE  trip_event.valid=1 ORDER BY created_at DESC LIMIT $travelPage_start, $per_page ";
     $resultTravel = $conn->query($sqlTravel);
-    $travelCount=$resultTravel->num_rows;
-    
+    $resultTravelAll = $conn->query($sqlTravelAll);
+    $travelCount=$resultTravelAll->num_rows;
+
+    $totalPage = ceil($userCount / $per_page);
+   
+    $totalTravelPage = ceil($travelCount /$per_page);
+
 } else {
     if (isset($_GET["userPage"])) {
         $userPage = $_GET["userPage"];
@@ -31,27 +64,40 @@ if (isset($_GET["search"])) {
     } else {
         $travelPage = 1;
     }
-  
-
-    $sqlAll = "SELECT * FROM travel_account WHERE valid=1 ";
+    if(isset($_GET["area"])){
+        $area=$_GET["area"];
+    }else{
+        $area=3;
+    }
+    $per_page = 5;
+    // $page=1;
+    $userPage_start = ($userPage - 1) * $per_page;
+    $travelPage_start = ($travelPage - 1) * $per_page;
+    if($area==0||$area==1||$area==2){
+        $sqlAll = "SELECT * FROM travel_account WHERE valid=1 AND area='$area'";
+        $sql="SELECT * FROM travel_account WHERE valid=1 AND area='$area' ORDER BY created_at DESC LIMIT  $userPage_start,$per_page ";  
+    }else{
+        $sqlAll = "SELECT * FROM travel_account WHERE valid=1 ";
+        $sql = "SELECT * FROM travel_account WHERE valid=1 ORDER BY created_at DESC LIMIT $userPage_start, $per_page";
+    }
+   
     $sqlTravelAll = "SELECT * FROM trip_event WHERE valid=1 ORDER BY created_at DESC";
     $resultAll = $conn->query($sqlAll);
     $userCount = $resultAll->num_rows;
     $resultTravelAll = $conn->query($sqlTravelAll);
     $travelCount=$resultTravelAll->num_rows;
 
-    $per_page = 5;
-    // $page=1;
-    $userPage_start = ($userPage - 1) * $per_page;
-    $travelPage_start = ($travelPage - 1) * $per_page;
+    
 
 
-    $sql = "SELECT * FROM travel_account WHERE valid=1 ORDER BY created_at DESC LIMIT $userPage_start, $per_page";
+   
     $sqlTravel = "SELECT trip_event.*,travel_account.account,travel_account.id as account_id FROM trip_event JOIN travel_account ON trip_event.owner=travel_account.account WHERE  trip_event.valid=1 ORDER BY created_at DESC LIMIT $travelPage_start, $per_page ";
+    
     $result = $conn->query($sql);
     $resultTravel = $conn->query($sqlTravel);
     //計算頁數
-    $totalPage = ceil($userCount / $per_page);
+     $totalPage = ceil($userCount / $per_page);
+   
     $totalTravelPage = ceil($travelCount /$per_page);
     // var_dump($travelCount);
     // exit;
@@ -60,7 +106,10 @@ if (isset($_GET["search"])) {
     $resultTripComment = $conn->query($sqlTripComment);
     $tripCommentCount = $resultTripComment->num_rows;
     
+    
 }
+
+
 $rowsTripComment=$resultTripComment->fetch_all(MYSQLI_ASSOC);
 
 $rowsTravel=$resultTravel->fetch_all(MYSQLI_ASSOC);
@@ -120,6 +169,10 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
             color: var(--white);
 
         }
+        .active{
+            background: var(--blue);
+            color: var(--white);
+        }
     </style>
 </head>
 
@@ -139,7 +192,7 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                 </li>
 
                 <li>
-                    <a href="#">
+                    <a href="../home/admin.php">
                         <span class="icon">
                             <ion-icon name="home-outline"></ion-icon>
                         </span>
@@ -213,7 +266,7 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                 <div class="search">
                     <form action="admin-travel.php" method="get">
                         <label>
-                            <input type="text" placeholder="Search here" class="form-control" name="search">
+                            <input type="text" placeholder="Search account here" class="form-control" name="search">
                             <ion-icon name="search-outline"></ion-icon>
                             <!-- <button type="submit" class="btn btn-info">搜尋</button> -->
                         </label>
@@ -253,18 +306,18 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                     </div>
 
                     <div class="iconBx">
-                        <ion-icon name="cart-outline"></ion-icon>
+                        <ion-icon name="chatbubbles-outline"></ion-icon>
                     </div>
                 </div>
 
-                <div class="card">
+                <!-- <div class="card">
                     <div>
                         <div class="numbers">284</div>
-                        <div class="cardName">Travel總成交量</div>
+                        <div class="cardName">Travel總成交訂單</div>
                     </div>
 
                     <div class="iconBx">
-                        <ion-icon name="chatbubbles-outline"></ion-icon>
+                        <ion-icon name="cart-outline"></ion-icon>
                     </div>
                 </div>
 
@@ -277,49 +330,63 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                     <div class="iconBx">
                         <ion-icon name="cash-outline"></ion-icon>
                     </div>
-                </div>
+                </div> -->
             </div>
 
             <!-- ================ Order Details List ================= -->
             <div class="details">
                 <div class="recentOrders">
-                    <div class="cardHeader">
-                        <h2>Travel清單</h2>
+                    <div class="cardHeader row">
+                        <h2 class="col-4">Travel清單</h2>
                         <!-- <a href="#" class="btn">View All</a> -->
+                        <div class="row col-8 justify-content-start">
                         <?php if (isset($_GET["search"])) : ?>
-                            <div class="py-2">
+                            <h1 class="col-8"><?= $_GET["search"] ?> 的搜尋結果</h1>
+                            <div class="py-2 col-4">
                                 <a class="btn btn-info" href="admin-travel.php">回使用者列表</a>
                             </div>
-                            <h1><?= $_GET["search"] ?> 的搜尋結果</h1>
+                            
                         <?php endif; ?>
+                        </div>
                         
                         <div class=" d-flex justify-content-end">
                             <div class=" area-radio mx-2  d-flex justify-content-end">
-                                <button class="px-2 mx-1 border-radius">北</button>
-                                <button class="px-2 mx-1 ">中</button>
-                                <button class="px-2 mx-1 ">南</button>
+                                <?php if(isset($_GET["search"])):?>
+                                <a class=" p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==0){ echo 'active';}?>" href="admin-travel.php?search=<?=$_GET["search"]?>&&area=0">北</a><!--0 -->
+                                <a class="p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==1){ echo 'active';}?>" href="admin-travel.php?search=<?=$_GET["search"]?>&&area=1">中</a><!-- 1 -->
+                                <a class="p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==2){ echo 'active';}?>" href="admin-travel.php?search=<?=$_GET["search"]?>&&area=2">南</a><!-- 2 -->
+                                <a class=" p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==3){ echo 'active';}?>" href="admin-travel.php?search=<?=$_GET["search"]?>">All</a><!-- 3 -->
+                                <?php else:?>
+                                    <a class=" p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==0){ echo 'active';}?>" href="admin-travel.php?area=0">北</a><!--0 -->
+                                    <a class="p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==1){ echo 'active';}?>" href="admin-travel.php?area=1">中</a><!-- 1 -->
+                                    <a class="p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==2){ echo 'active';}?>" href="admin-travel.php?area=2">南</a><!-- 2 -->
+                                    <a class=" p-2 mx-1 rounded border-none border border-0 text-decoration-none <?php if($area==3){ echo 'active';}?>" href="admin-travel.php">All</a><!-- 3 -->
+                                <?php endif;?>
+
                             </div>
                             <a class="btn btn-info" href="admin-add-travel-user.php">新增Travel廠商</a>
                         </div>
+                        
                     </div>
+                    
 
                     <table>
                         <thead>
                             <tr>
-                                <td>id</td>
+                                <td>公司名稱</td>
                                 <td>帳戶</td>
-                                <td>姓名</td>
+                                <td>負責人</td>
                                 <td>電話</td>
                                 <td>信箱</td>
                                 <td>操作</td>
                             </tr>
                         </thead>
                         <?php if ($userCount > 0) : ?>
-                            <tbody>
+                            <tbody style="height:290px;">
                                 <?php foreach ($rows as $row) : ?>
-                                    <tr>
+                                    <tr >
 
-                                        <td><?= $row["id"] ?></td>
+                                        <td><?=$row["company_name"]  ?></td>
                                         <td><?= $row["account"] ?></td>
                                         <td><?= $row["name"] ?></td>
                                         <td><?= $row["company_phone"] ?></td>
@@ -329,71 +396,30 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                                             <a class="btn btn-danger" href="admin-delete-travel-user.php?id=<?= $row["id"] ?>">刪除</a>
                                         </td>
                                     </tr>
-
-                                    <!--  <tr>
-                                        <td>Star Refrigerator</td>
-                                        <td>$1200</td>
-                                        <td>Paid</td>
-                                        <td><span class="status delivered">Delivered</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Dell Laptop</td>
-                                        <td>$110</td>
-                                        <td>Due</td>
-                                        <td><span class="status pending">Pending</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Apple Watch</td>
-                                        <td>$1200</td>
-                                        <td>Paid</td>
-                                        <td><span class="status return">Return</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Addidas Shoes</td>
-                                        <td>$620</td>
-                                        <td>Due</td>
-                                        <td><span class="status inProgress">In Progress</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Star Refrigerator</td>
-                                        <td>$1200</td>
-                                        <td>Paid</td>
-                                        <td><span class="status delivered">Delivered</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Dell Laptop</td>
-                                        <td>$110</td>
-                                        <td>Due</td>
-                                        <td><span class="status pending">Pending</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Apple Watch</td>
-                                        <td>$1200</td>
-                                        <td>Paid</td>
-                                        <td><span class="status return">Return</span></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td>Addidas Shoes</td>
-                                        <td>$620</td>
-                                        <td>Due</td>
-                                        <td><span class="status inProgress">In Progress</span></td>
-                                    </tr> -->
                                 <?php endforeach; ?>
                             </tbody>
+                            <?php else:?>
+                                <tbody style="height:290px;">
+                                    <tr>
+                                        <td class="text-center" colspan="6">無合作業者</td>
+                                    
+                                    </tr>
+                                </tbody>
                         <?php endif; ?>
                     </table>
-                    <?php if (!isset($_GET["search"])) : ?>
+                    <?php if (isset($_GET["search"])) : ?>
                         <nav aria-label="Page navigation example">
                             <ul class="pagination">
                                 <?php for ($i = 1; $i <= $totalPage; $i++) : ?>
-                                    <li class="page-item <?php if ($i == $userPage) echo "active"; ?>"><a class="page-link" href="admin-travel.php?userPage=<?= $i ?>"><?= $i ?></a></li>
+                                    <li class="page-item <?php if ($i == $userPage) echo "active"; ?>"><a class="page-link"<?php if($area==0||$area==1||$area==2):?>href="admin-travel.php?search=<?=$_GET["search"]?>&&area=<?=$area?>&&userPage=<?=$i?>"<?php else:?> href="admin-travel.php?search=<?=$_GET["search"]?>&&userPage=<?=$i?><?php endif; ?>"><?= $i ?></a></li>
+                                <?php endfor; ?>
+                            </ul>
+                        </nav>
+                    <?php else:?>
+                        <nav aria-label="Page navigation example">
+                            <ul class="pagination">
+                                <?php for ($i = 1; $i <= $totalPage; $i++) : ?>
+                                    <li class="page-item <?php if ($i == $userPage) echo "active"; ?>"><a class="page-link"<?php if($area==0||$area==1||$area==2){ echo "href='admin-travel.php?area=$area&&userPage=$i'";}else{echo "href='admin-travel.php?userPage=$i'";}?>><?= $i ?></a></li>
                                 <?php endfor; ?>
                             </ul>
                         </nav>
@@ -406,10 +432,10 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                         <h2>最新上架行程清單</h2>
                     </div>
                                     <!-- 目前無上架行程 -->
-                    <table>
+                    <table class="">
                         <thead>
                             <tr>
-                                <td>id</td>
+                                
                                 <td>Travel業者</td>
                                 <td>行程名稱</td>
                                 <td>價格</td>
@@ -419,11 +445,11 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                             </tr>
                         </thead>
                         <?php if ($travelCount > 0) : ?>
-                            <tbody>
+                            <tbody style="height:290px;">
                                 <?php foreach ($rowsTravel as $row) : ?>
                                     <tr>
 
-                                        <td><?= $row["id"] ?></td>
+                                        
                                         <td><?= $row["owner"] ?></td>
                                         <td><?= $row["trip_name"] ?></td>
                                         <td><?= $row["price"] ?></td>
@@ -435,10 +461,25 @@ $rows = $result->fetch_all(MYSQLI_ASSOC);
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
+                            <?php else:?>
+                                <tbody style="height:290px;">
+                                    <tr>
+                                        <td class="text-center" colspan="6">無上架行程</td>
+                                    
+                                    </tr>
+                                </tbody>
                         <?php endif; ?>
                     </table>
-                    <?php if (!isset($_GET["search"])) : ?>
+                    <?php if (isset($_GET["search"])) : ?>
                         <nav aria-label="Page navigation example">
+                            <ul class="pagination">
+                                <?php for ($i = 1; $i <= $totalTravelPage; $i++) : ?>
+                                    <li class="page-item <?php if ($i == $travelPage) echo "active"; ?>"><a class="page-link" href="admin-travel.php?search=<?=$_GET["search"]?>&&travelPage=<?= $i ?>"><?= $i ?></a></li>
+                                <?php endfor; ?>
+                            </ul>
+                        </nav>
+                        <?php else:?>
+                            <nav aria-label="Page navigation example">
                             <ul class="pagination">
                                 <?php for ($i = 1; $i <= $totalTravelPage; $i++) : ?>
                                     <li class="page-item <?php if ($i == $travelPage) echo "active"; ?>"><a class="page-link" href="admin-travel.php?travelPage=<?= $i ?>"><?= $i ?></a></li>
